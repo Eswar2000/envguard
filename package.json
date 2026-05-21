@@ -12,6 +12,15 @@
     "edge"
   ],
   "license": "MIT",
+  "author": "Eswar2000",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Eswar2000/envguard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Eswar2000/envguard/issues"
+  },
+  "homepage": "https://github.com/Eswar2000/envguard#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -34,7 +43,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "example": "tsx examples/basic.ts"
+    "example": "tsx examples/basic.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
