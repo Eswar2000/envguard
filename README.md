@@ -35,7 +35,7 @@ instead of a crash six layers deep:
   │  ✗ Expected one of: development | production | test
   │  → Did you mean "production"?
   │
-  ┌─ JWT_SECRET  = "h***2"
+  ┌─ JWT_SECRET  = "h*****2"
   │  ✗ String must be at least 32 characters (got 7)
   │
   ┌─ DATABASE_URL  (required)
@@ -111,7 +111,9 @@ There's no `process.env` in Workers / Edge. Pass `source` explicitly:
 // Cloudflare Workers
 export default {
   fetch(req: Request, runtimeEnv: Env) {
-    const env = envguard(schema, { source: runtimeEnv });
+    const env = envguard(schema, {
+      source: runtimeEnv as Record<string, string | undefined>,
+    });
     // ...
   },
 };
@@ -132,7 +134,7 @@ Fields marked `.secret()` have their value masked in any error output:
 
 ```ts
 e.string().min(32).secret()
-// "hunter2" → "h***2" in error messages
+// "hunter2" → "h*****2" in error messages
 ```
 
 As a safety net, values are also masked automatically when the var name
