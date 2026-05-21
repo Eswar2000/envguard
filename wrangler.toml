@@ -1,0 +1,6 @@
+name = "envguard-smoke"
+main = "smoke/worker.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+API_KEY = "test-key-12345678"
