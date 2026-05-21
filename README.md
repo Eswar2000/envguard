@@ -1,12 +1,13 @@
 # envguard
 
-> Type-safe environment variable validator with beautiful errors.
-> **Zero dependencies. Edge-runtime compatible. ~2KB gzipped.**
+A small TypeScript library that validates `process.env` against a schema and
+hands you back a typed object. If anything is missing or malformed, it tells
+you exactly what — all of it, at once — and refuses to let the app start.
 
 ```ts
 import { envguard, e } from 'envguard';
 
-export const env = envguard({
+const env = envguard({
   NODE_ENV: e.enum(['development', 'production', 'test']).default('development'),
   PORT: e.port().default(3000),
   DATABASE_URL: e.url({ protocol: ['postgres', 'postgresql'] }),
@@ -16,59 +17,13 @@ export const env = envguard({
   ALLOWED_ORIGINS: e.csv(e.url()),
 });
 
-env.PORT;        // ✅ number
-env.NODE_ENV;    // ✅ 'development' | 'production' | 'test'
-env.REDIS_URL;   // ✅ string | undefined
+env.PORT;          // number
+env.NODE_ENV;      // 'development' | 'production' | 'test'
+env.REDIS_URL;     // string | undefined
 ```
 
-## Why?
-
-- **Fails fast at boot.** No more cryptic crashes 10 minutes into production.
-- **All errors at once.** Fix every config bug in one restart, not five.
-- **Beautiful errors.** Typo suggestions, missing-var examples, masked secrets.
-- **Fully typed output.** No more `process.env.X!` defensive non-null asserts.
-- **Works anywhere.** Node, Bun, Deno, Cloudflare Workers, Vercel Edge.
-- **Zero dependencies.** ~2KB gzipped.
-
-## Install
-
-```bash
-npm i envguard
-# or: pnpm add envguard / yarn add envguard / bun add envguard
-```
-
-## Schema builders
-
-| Builder | Output type | Example raw value |
-|---|---|---|
-| `e.string()` | `string` | `"hello"` |
-| `e.string().min(n).max(n).regex(re)` | `string` | |
-| `e.number()` | `number` | `"42"` |
-| `e.number().min(n).max(n).int()` | `number` | |
-| `e.port()` | `number` (1–65535) | `"8080"` |
-| `e.boolean()` | `boolean` | `"true"`, `"1"`, `"yes"`, `"on"` |
-| `e.enum(['a','b'])` | `'a' \| 'b'` | `"a"` |
-| `e.url({ protocol })` | `string` | `"https://x.com"` |
-| `e.csv(e.string())` | `string[]` | `"a,b,c"` |
-
-### Modifiers (chain on any builder)
-
-- `.optional()` — allow missing. Output type becomes `T \| undefined`.
-- `.default(value)` — fallback when missing.
-- `.secret()` — mask the value in error messages.
-
-## Error output
-
-Given a broken environment:
-
-```bash
-PORT=abc
-NODE_ENV=prdouction
-JWT_SECRET=hunter2
-# DATABASE_URL missing
-```
-
-You get:
+If something's wrong, you get a single, readable failure report on stderr
+instead of a crash six layers deep:
 
 ```
 ✘ envguard: Invalid environment (4 errors)
@@ -85,13 +40,72 @@ You get:
   │
   ┌─ DATABASE_URL  (required)
   │  ✗ Missing (required)
+```
 
-Fix all errors above and restart.
+## Install
+
+```sh
+npm install envguard
+```
+
+Requires Node 18+. Works in Bun, Deno, and edge runtimes (Cloudflare Workers,
+Vercel Edge) — see [Edge runtimes](#edge-runtimes) below.
+
+## Builders
+
+All builders live on the `e` namespace.
+
+| Builder                | Returns        | Reads from env as              |
+| ---------------------- | -------------- | ------------------------------ |
+| `e.string()`           | `string`       | any                            |
+| `e.number()`           | `number`       | `"42"`, `"3.14"`               |
+| `e.port()`             | `number`       | `"8080"` (1–65535)             |
+| `e.boolean()`          | `boolean`      | `true/false/1/0/yes/no/on/off` |
+| `e.enum([...])`        | union literal  | one of the listed strings      |
+| `e.url({ protocol })`  | `string`       | `https://...`                  |
+| `e.csv(item)`          | `T[]`          | `"a,b,c"`                      |
+
+Builders with constraints:
+
+```ts
+e.string().min(8).max(64).regex(/^[A-Z0-9_]+$/)
+e.number().int().min(1).max(100)
+e.url({ protocol: ['https'] })
+e.csv(e.url())
+```
+
+Modifiers (chainable on any builder):
+
+- `.optional()` — allow missing; output type becomes `T | undefined`.
+- `.default(value)` — value to use when the var is missing or empty.
+- `.secret()` — mask this value in error messages.
+
+A var is treated as "missing" when it's `undefined` *or* the empty string,
+which matches how shells and `.env` files behave in practice.
+
+## Error handling
+
+By default, `envguard` throws an `EnvguardError` whose `message` is the
+formatted report. You can change that:
+
+```ts
+// throws (default) — good for libraries, gives you a stack trace
+envguard(schema);
+
+// prints to stderr and process.exit(1) — good for CLIs and server entry points
+envguard(schema, { onError: 'exit' });
+
+// returns { ok: false, errors, message } instead of throwing — good for tests
+const r = envguard(schema, { onError: 'collect' });
+if (!r.ok) {
+  console.error(r.message);
+  console.error(r.errors); // structured, one entry per failing var
+}
 ```
 
 ## Edge runtimes
 
-Don't have `process.env`? Pass `source` explicitly:
+There's no `process.env` in Workers / Edge. Pass `source` explicitly:
 
 ```ts
 // Cloudflare Workers
@@ -103,14 +117,51 @@ export default {
 };
 ```
 
-## Error modes
+Same trick is useful in tests, where you want a deterministic environment
+instead of leaking in whatever's in your shell:
 
 ```ts
-envguard(schema);                              // throws EnvguardError (default)
-envguard(schema, { onError: 'exit' });         // prints and process.exit(1)
-const r = envguard(schema, { onError: 'collect' });
-if (!r.ok) console.error(r.message);           // returns { ok: false, errors }
+const env = envguard(schema, {
+  source: { PORT: '3000', DATABASE_URL: 'postgresql://localhost/test' },
+});
 ```
+
+## Secret masking
+
+Fields marked `.secret()` have their value masked in any error output:
+
+```ts
+e.string().min(32).secret()
+// "hunter2" → "h***2" in error messages
+```
+
+As a safety net, values are also masked automatically when the var name
+matches `SECRET`, `KEY`, `TOKEN`, `PASSWORD`, `PASS`, `PWD`, `DSN`, or
+`CREDENTIAL` (case-insensitive). For names that don't match the pattern,
+add `.secret()` explicitly.
+
+## Scope
+
+This library does one thing: parse and validate a map of strings against a
+schema, with good errors. It deliberately doesn't:
+
+- Load `.env` files — use [`dotenv`](https://www.npmjs.com/package/dotenv) or
+  Node's built-in `--env-file` flag and pipe the result in.
+- Reload at runtime — env is read once, at startup.
+- Wrap or replace `process.env` — the returned object is independent.
+
+## Prior art
+
+- [`envalid`](https://github.com/af/envalid) — the long-standing option, and
+  the inspiration for the API shape here. envguard differs in error UX
+  (all-at-once, typo suggestions, secret masking), zero dependencies, and
+  edge-runtime safety.
+- [`znv`](https://github.com/lostfictions/znv) — Zod-based, smaller scope.
+- [`@t3-oss/env-core`](https://github.com/t3-oss/t3-env) — great if you're
+  already on the T3 stack; heavier and more opinionated.
+
+If one of those fits, use it. envguard exists for projects that want
+something small, runtime-portable, and friendlier when things break.
 
 ## License
 
