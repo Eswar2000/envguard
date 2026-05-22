@@ -1,5 +1,5 @@
 {
-  "name": "envguard",
+  "name": "@eswar2000/envguard",
   "version": "0.1.0",
   "description": "Type-safe environment variable validator with beautiful errors. Zero dependencies. Edge-runtime compatible.",
   "keywords": [

@@ -5,7 +5,7 @@ hands you back a typed object. If anything is missing or malformed, it tells
 you exactly what — all of it, at once — and refuses to let the app start.
 
 ```ts
-import { envguard, e } from 'envguard';
+import { envguard, e } from '@eswar2000/envguard';
 
 const env = envguard({
   NODE_ENV: e.enum(['development', 'production', 'test']).default('development'),
@@ -45,7 +45,7 @@ instead of a crash six layers deep:
 ## Install
 
 ```sh
-npm install envguard
+npm install @eswar2000/envguard
 ```
 
 Requires Node 18+. Works in Bun, Deno, and edge runtimes (Cloudflare Workers,
