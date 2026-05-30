@@ -1,6 +1,6 @@
 {
   "name": "@eswar2000/envguard",
-  "version": "0.2.0-dev",
+  "version": "0.2.0",
   "description": "Type-safe environment variable validator with beautiful errors. Zero dependencies. Edge-runtime compatible.",
   "keywords": [
     "env",
@@ -38,7 +38,7 @@
     }
   },
   "bin": {
-    "envguard": "./dist/cli/index.js"
+    "envguard": "dist/cli/index.js"
   },
   "files": [
     "dist",
