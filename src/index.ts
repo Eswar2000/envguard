@@ -83,7 +83,11 @@ export function envguard<S extends Record<string, Schema<unknown>>>(
   }
 
   if (errors.length === 0) {
-    return Object.freeze(out) as InferShape<S>;
+    const frozen = Object.freeze(out) as InferShape<S>;
+    if (onError === 'collect') {
+      return { ok: true, env: frozen } as EnvguardResult<S>;
+    }
+    return frozen;
   }
 
   const message = formatErrors(errors, {
@@ -114,3 +118,4 @@ export class EnvguardError extends Error {
 }
 
 export type { FieldError } from './errors/format.js';
+export { formatErrors } from './errors/format.js';

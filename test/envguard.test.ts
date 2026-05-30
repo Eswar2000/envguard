@@ -44,6 +44,17 @@ describe('envguard - happy path', () => {
     expect(env.REDIS_URL).toBeUndefined();
   });
 
+  it('wraps success in { ok: true, env } when onError is "collect"', () => {
+    const result = envguard(
+      { PORT: e.port() },
+      { source: { PORT: '8080' }, onError: 'collect' },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.env.PORT).toBe(8080);
+    }
+  });
+
   it('parses booleans from common truthy/falsy strings', () => {
     const cases: Array<[string, boolean]> = [
       ['true', true], ['1', true], ['yes', true], ['ON', true],
