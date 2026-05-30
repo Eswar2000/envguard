@@ -103,6 +103,63 @@ if (!r.ok) {
 }
 ```
 
+## CLI
+
+For CI pipelines and local pre-flight checks, envguard ships a small zero-dep
+CLI. Define a schema file once and reuse it everywhere.
+
+```sh
+# env.schema.mjs (or .js / .cjs)
+import { e } from '@eswar2000/envguard';
+
+export default {
+  PORT: e.port().default(3000),
+  DATABASE_URL: e.url({ protocol: ['postgres', 'postgresql'] }),
+  JWT_SECRET: e.string().min(32).secret(),
+};
+```
+
+```sh
+# Validate process.env against ./env.schema.mjs
+npx envguard check
+
+# Validate a .env file (CI pre-deploy check, or local .env.production)
+npx envguard check -e .env.production
+
+# Machine-readable output for build tooling
+npx envguard check --format json
+```
+
+Flags:
+
+| Flag                      | Purpose                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `--schema <path>`         | Schema file path. Defaults to auto-discovering           |
+|                           | `env.schema.{js,mjs,cjs}` in the current directory.      |
+| `-e, --env <path>`        | Read env from a `.env` file instead of `process.env`.    |
+| `--format <pretty\|json>` | Output format. Default `pretty`.                         |
+| `--quiet`                 | Suppress stdout; rely on the exit code only.             |
+| `-h, --help`              | Show usage.                                              |
+| `-v, --version`           | Show CLI version.                                        |
+
+Exit codes:
+
+- `0` — all variables valid.
+- `1` — validation failed (one or more variables are missing or malformed).
+- `2` — usage or configuration error (bad flag, missing schema file,
+  unreadable env file).
+
+Drop it into any CI step that should block on a bad config:
+
+```yaml
+# .github/workflows/deploy.yml
+- name: Validate production env
+  run: npx envguard check -e .env.production
+```
+
+> The CLI deliberately uses `--env` (not `--env-file`) because Node 20.6+
+> consumes `--env-file` as a built-in flag before the script sees it.
+
 ## Edge runtimes
 
 There's no `process.env` in Workers / Edge. Pass `source` explicitly:
@@ -147,8 +204,9 @@ add `.secret()` explicitly.
 This library does one thing: parse and validate a map of strings against a
 schema, with good errors. It deliberately doesn't:
 
-- Load `.env` files — use [`dotenv`](https://www.npmjs.com/package/dotenv) or
-  Node's built-in `--env-file` flag and pipe the result in.
+- Load `.env` files from the library API — use [`dotenv`](https://www.npmjs.com/package/dotenv)
+  or Node's built-in `--env-file` flag and pipe the result in. (The bundled
+  [CLI](#cli) does read `.env` files, since that's its job.)
 - Reload at runtime — env is read once, at startup.
 - Wrap or replace `process.env` — the returned object is independent.
 
